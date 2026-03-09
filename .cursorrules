@@ -1,0 +1,414 @@
+# PROJECT: PHANTOM
+# Proportional-Navigation Heuristic Adaptive Missile-Tracking Nullification
+# Author: Naresh Dama | March 2026 | Jacksonville, FL
+# Target: IEEE TAES | Cursor + Python 3.11 | All phases use PHANTOM naming
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 1. PROJECT IDENTITY AND CONTEXT
+## ─────────────────────────────────────────────────────────────────────────────
+
+This project implements a kinematically consistent missile guidance deception
+system that exploits Extended Kalman Filter (EKF) chi-squared gating in
+Proportional Navigation (PN)-guided missiles. The goal is simulation-validated
+research suitable for IEEE TAES publication.
+
+- Language: Python 3.11
+- IDE: Cursor (VS Code-based)
+- Research domain: Aerospace guidance, Electronic Warfare, Estimation Theory
+- Target venue: IEEE Transactions on Aerospace and Electronic Systems (TAES)
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 2. DIRECTORY AND FILE ORGANIZATION
+## ─────────────────────────────────────────────────────────────────────────────
+
+Enforce this exact project structure. Do not deviate without explicit reason.
+
+phantom/
+├── core/
+│   ├── __init__.py
+│   ├── ekf.py                  # EKF with chi-squared innovation gating
+│   ├── guidance.py             # Proportional Navigation guidance law
+│   ├── injection.py            # PHANTOM false signal injection profiles
+│   ├── simulator.py            # PhantomSimulator — main engagement engine
+│   └── utils.py                # Shared helpers (coordinate transforms, math)
+├── experiments/
+│   ├── __init__.py
+│   ├── baseline_validation.py  # PHANTOM Exp 1: no-injection baseline
+│   ├── step_injection.py       # PHANTOM Exp 2: step injection detectability
+│   ├── ramp_rate_sweep.py      # PHANTOM Exp 3: critical rate identification
+│   ├── sensitivity_analysis.py # PHANTOM Exp 4: parameter sensitivity
+│   └── monte_carlo.py          # PHANTOM Exp 5+: full Monte Carlo runs
+├── training/
+│   ├── dataset_generator.py    # PhantomDatasetGenerator — 100K scenarios
+│   ├── format_llm_data.py      # Convert HDF5 → JSONL for LLM fine-tuning
+│   ├── finetune_llm.py         # PhantomLLMController — Phi-3-Mini LoRA
+│   └── quantize_model.py       # 4-bit NF4 quantization + ONNX export
+├── analysis/
+│   ├── statistics.py           # PHANTOM stats: miss distance, detection rate
+│   ├── visualization.py        # PHANTOM publication figures (300 DPI)
+│   └── generate_report.py      # PHANTOM_PhaseX_ValidationReport generator
+├── tests/
+│   ├── __init__.py
+│   ├── test_ekf.py
+│   ├── test_guidance.py
+│   ├── test_injection.py
+│   ├── test_simulator.py
+│   └── test_integration.py
+├── configs/
+│   └── phantom_config.yaml     # PHANTOM single source of truth — all params
+├── data/
+│   └── results/                # phantom_*.h5 and phantom_*.csv (gitignored)
+├── figures/                    # phantom_fig*.png at 300 DPI (gitignored)
+├── models/                     # PhantomLLMController weights (gitignored)
+├── docs/
+│   ├── API.md
+│   └── PHANTOM_PhaseX_ValidationReport.md
+├── .cursorrules                # This file — PHANTOM Cursor rules
+├── .gitignore
+├── requirements.txt
+├── README.md                   # "PHANTOM: Proportional-Navigation Heuristic..."
+└── pyproject.toml
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 3. FILE SIZE AND GITHUB COMPATIBILITY RULES
+## ─────────────────────────────────────────────────────────────────────────────
+
+GitHub enforces a 100MB file size limit. Files above 50MB require Git LFS.
+Cursor must help enforce these boundaries at all times.
+
+RULES:
+- No single Python source file should exceed 500 lines. If a module grows
+  beyond this, split it into a subpackage (e.g., core/ekf/ with __init__.py).
+- No data file (HDF5, CSV, PNG) should be committed to Git. Use .gitignore.
+- All generated outputs go into data/results/ or figures/ — both are gitignored.
+- Configuration files (YAML) are committed. Keep them under 100 lines.
+- If a training dataset is required, reference the file path in a config.
+  Never hard-code large arrays in source files.
+- Model weights and checkpoints go into models/ which is gitignored.
+- If a file must be shared, use Zenodo, HuggingFace Hub, or a DOI-linked archive.
+
+GITIGNORE additions to always suggest:
+  data/results/
+  figures/
+  models/
+  __pycache__/
+  *.h5
+  *.hdf5
+  *.csv
+  *.png
+  *.pt
+  *.bin
+  venv/
+  .env
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 4. MODULARITY AND CODE STRUCTURE RULES
+## ─────────────────────────────────────────────────────────────────────────────
+
+Every piece of functionality must live in its smallest logical unit.
+No monolithic scripts. No copy-paste across files.
+
+RULES:
+- One class per file is the default. If two small classes are tightly coupled
+  (e.g., InjectionProfile and its subclasses), they may share a file.
+- Every class must have a clear single responsibility.
+- Functions should do one thing. If a function exceeds 40 lines, consider
+  breaking it into private helper methods (_compute_jacobian, _wrap_angle, etc.).
+- Use abstract base classes (ABC) for families of interchangeable objects
+  (e.g., InjectionProfile, SensorModel).
+- All inter-module communication happens through well-defined interfaces.
+  No direct state access across module boundaries.
+- Configuration is injected via dictionaries or dataclasses, never hardcoded
+  inside classes.
+
+EXAMPLE of correct modularity:
+  # GOOD — each class owns its behavior
+  class ExtendedKalmanFilter:
+      def predict(self, dt: float) -> None: ...
+      def update(self, z: np.ndarray, missile_pos: np.ndarray) -> Tuple[float, bool]: ...
+
+  # BAD — mixing guidance logic inside EKF
+  class EKFWithGuidance:
+      def update_and_compute_accel(self, ...): ...  # ← Never do this
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 5. NAMING CONVENTIONS
+## ─────────────────────────────────────────────────────────────────────────────
+
+Follow Python PEP 8 strictly. This is a research codebase that will be reviewed
+by aerospace engineers and may accompany an IEEE submission.
+
+- Classes: PascalCase                → ExtendedKalmanFilter, LinearRampInjection
+- Functions/methods: snake_case      → compute_acceleration(), get_statistics()
+- Constants: UPPER_SNAKE_CASE        → CHI2_THRESHOLD_99 = 9.21
+- Private methods: _leading_underscore → _wrap_angle(), _compute_jacobian()
+- Files: snake_case.py               → ekf.py, ramp_rate_sweep.py
+- Config keys: snake_case strings    → "process_noise", "nav_ratio"
+- Test functions: test_<behavior>    → test_chi_squared_gate_rejects_outlier()
+
+Do not abbreviate variable names unless the abbreviation is a standard aerospace
+convention (e.g., LOS, PN, EKF, KF). Always prefer clarity over brevity.
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 6. TYPE HINTS AND DOCSTRINGS
+## ─────────────────────────────────────────────────────────────────────────────
+
+All public functions and methods must have:
+  1. Full type hints on all parameters and return values
+  2. A NumPy-style docstring with Args, Returns, and Raises sections
+  3. At least one usage example in the docstring for non-trivial functions
+
+The docstring tone should be natural and research-oriented — explain the
+physical or mathematical meaning, not just what the code does mechanically.
+
+EXAMPLE:
+  def update(self, z: np.ndarray, missile_pos: np.ndarray) -> Tuple[float, bool]:
+      """
+      Perform the EKF measurement update with chi-squared innovation gating.
+
+      When the measured bearing deviates significantly from the predicted value,
+      the innovation statistic gamma_k will exceed the chi-squared threshold,
+      causing the filter to reject the measurement. This is the central
+      mechanism exploited by the false signal injection strategy.
+
+      Args:
+          z (np.ndarray): Measurement vector [range (m), bearing (rad)], shape (2,).
+          missile_pos (np.ndarray): Current missile position [x, y] in meters, shape (2,).
+
+      Returns:
+          Tuple[float, bool]: (gamma_k, accepted) where gamma_k is the
+              chi-squared innovation statistic and accepted indicates whether
+              the measurement passed the gate.
+
+      Raises:
+          ValueError: If z does not have shape (2,).
+      """
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 7. COMMENTING STYLE — NATURAL RESEARCH TONE
+## ─────────────────────────────────────────────────────────────────────────────
+
+Inline comments should read like a researcher explaining their reasoning to
+a colleague, not like a programmer narrating what the code does line-by-line.
+
+RULES:
+- Comment the "why", not the "what". The code shows what; the comment explains
+  the physical or algorithmic reasoning.
+- Use full sentences with proper capitalization and punctuation.
+- Avoid vague comments like "# process data" or "# update state".
+- Prefer section-dividing comments for long methods to mark logical stages.
+
+EXAMPLES:
+
+  # BAD — states the obvious
+  rpred = np.sqrt(dx**2 + dy**2)  # compute predicted range
+
+  # GOOD — explains the physical geometry
+  # Predicted range from the EKF's current target position estimate to
+  # the known missile position. This forms the first component of h(x).
+  r_pred = np.sqrt(dx**2 + dy**2)
+
+  # BAD — vague section label
+  # update
+
+  # GOOD — explains the algorithmic stage
+  # --- Kalman Gain and State Correction ---
+  # With the measurement accepted, we apply the standard linear correction.
+  # The gain K balances prediction uncertainty against measurement noise.
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 8. TESTING RULES
+## ─────────────────────────────────────────────────────────────────────────────
+
+Testing is not optional. All core modules must be covered before experiments run.
+
+RULES:
+- Minimum 85% code coverage across the core/ package.
+- EKF and guidance modules require ≥90% coverage.
+- Each test function tests exactly one behavior (not a workflow).
+- Test names must be descriptive: test_chi_squared_gate_accepts_valid_measurement()
+  not test_update().
+- Use pytest fixtures for shared setup (e.g., a default EKF config).
+- Integration tests go in test_integration.py and test full engagement pipelines.
+- Always add a multiprocessing guard to experiment scripts:
+    if __name__ == "__main__":
+        ...  # required for Windows compatibility with Pool
+
+STRUCTURE for test files:
+  # tests/test_ekf.py
+  import pytest
+  import numpy as np
+  from core.ekf import ExtendedKalmanFilter
+
+  @pytest.fixture
+  def default_ekf():
+      Q = np.eye(4) * 0.1
+      R = np.diag([10.0**2, (0.5 * np.pi / 180)**2])
+      return ExtendedKalmanFilter(Q, R)
+
+  def test_prediction_updates_position_with_constant_velocity(default_ekf):
+      ...
+
+  def test_chi_squared_gate_rejects_large_innovation(default_ekf):
+      ...
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 9. CONFIGURATION AND REPRODUCIBILITY
+## ─────────────────────────────────────────────────────────────────────────────
+
+All simulation parameters live in configs/config.yaml. Nothing is hardcoded.
+Reproducibility is a publication requirement — treat it as non-negotiable.
+
+RULES:
+- Load config at the top of every experiment script using PyYAML.
+- All random number generators must accept an explicit seed parameter.
+- Seeds must be logged alongside results so any run can be reproduced exactly.
+- Experiment scripts must accept --seed and --output command-line arguments
+  via argparse.
+- Results must be saved with a timestamp and seed embedded in the filename:
+    data/results/ramp_sweep_seed42_20260309.csv
+
+EXAMPLE config.yaml structure:
+  simulation:
+    timestep: 0.02          # seconds; 50 Hz update rate
+    max_time: 30.0          # maximum engagement duration
+    nav_ratio: 4.0          # PN navigation constant N
+    process_noise: 0.1      # EKF process noise scalar
+    range_noise: 10.0       # measurement noise: range (m)
+    bearing_noise: 0.00873  # measurement noise: bearing (rad) ≈ 0.5 deg
+    chi2_threshold: 9.21    # 99% confidence, 2 DOF chi-squared critical value
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 10. CODE QUALITY TOOLS (AUTOMATED ENFORCEMENT)
+## ─────────────────────────────────────────────────────────────────────────────
+
+The following tools must be configured and passing before any code is committed.
+Cursor should suggest corrections inline using these standards.
+
+Tools and standards:
+  - black (formatting)     → line length 100, target Python 3.11
+  - pylint (linting)       → minimum score 8.0/10
+  - flake8 (style)         → max line length 100, ignore E203, W503
+  - mypy (type checking)   → strict mode on core/ package
+  - pytest-cov (coverage)  → minimum 85% on core/
+
+pyproject.toml configuration:
+  [tool.black]
+  line-length = 100
+  target-version = ["py311"]
+
+  [tool.mypy]
+  strict = true
+  ignore_missing_imports = true
+
+  [tool.pytest.ini_options]
+  addopts = "--cov=core --cov-report=term-missing"
+  testpaths = ["tests"]
+
+Run full QA check before committing:
+  black core experiments tests
+  pylint core --rcfile=.pylintrc
+  flake8 core experiments --max-line-length=100
+  mypy core
+  pytest tests -v
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 11. PUBLICATION-QUALITY FIGURE RULES
+## ─────────────────────────────────────────────────────────────────────────────
+
+Figures are first-class deliverables. They must be publication-ready from the
+moment they are generated — not "fixed later in Illustrator."
+
+RULES:
+- All figures saved at 300 DPI minimum using plt.savefig(..., dpi=300, bbox_inches='tight')
+- Use seaborn's "paper" context: sns.set_context("paper")
+- Font family: serif, size 10pt (matching IEEE Transactions column width)
+- Figure width: 3.5 inches (single column) or 7.0 inches (double column)
+- Axis labels must include units in parentheses: "Miss Distance (m)", "Time (s)"
+- Every figure must have a legend if more than one data series is present
+- Color choices must be colorblind-safe (use matplotlib's tab10 or seaborn colorblind palette)
+- Save to figures/ with descriptive filenames: ramp_rate_optimization_phase2.png
+
+EXAMPLE:
+  sns.set_context("paper")
+  plt.rcParams["font.family"] = "serif"
+  plt.rcParams["font.size"] = 10
+  fig, ax = plt.subplots(figsize=(3.5, 2.8))
+  ...
+  plt.savefig("figures/baseline_miss_distribution.png", dpi=300, bbox_inches="tight")
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 12. GIT COMMIT AND BRANCH RULES
+## ─────────────────────────────────────────────────────────────────────────────
+
+RULES:
+- Commit messages follow the format: [Phase X] <verb> <object>
+    Example: [Phase 1] Add EKF chi-squared gating with unit tests
+    Example: [Phase 2] Implement linear ramp injection profile
+- One logical change per commit. Do not bundle unrelated changes.
+- Branch names: phase-1-foundation, phase-2-simulation, phase-3-llm, etc.
+- Never commit directly to main. Use a feature branch and merge after QA passes.
+- Tag releases at each phase gate: v1.0-phase1-complete, v2.0-phase2-complete
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 13. ANTI-PATTERNS — NEVER DO THESE
+## ─────────────────────────────────────────────────────────────────────────────
+
+The following patterns will be flagged as errors by Cursor:
+
+  ❌ Hardcoded parameter values inside class methods (use config dict)
+  ❌ print() statements for debugging in core/ (use logging module)
+  ❌ Mutable default arguments: def run(config={}): ...
+  ❌ Bare except clauses: except: pass
+  ❌ Global mutable state shared across modules
+  ❌ np.random.seed() called globally (use np.random.RandomState(seed) locally)
+  ❌ Saving large binary files to Git (HDF5, model weights, PNG)
+  ❌ Functions longer than 60 lines without being broken into helpers
+  ❌ Test functions that test more than one behavior
+  ❌ Magic numbers without named constants
+      BAD:  if gamma_k > 9.21:
+      GOOD: if gamma_k > CHI2_THRESHOLD_99:
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 14. AEROSPACE AND RESEARCH DOMAIN STANDARDS
+## ─────────────────────────────────────────────────────────────────────────────
+
+This is a defense-adjacent research simulation. Precision, traceability, and
+physical correctness are as important as software quality.
+
+RULES:
+- All physical quantities must be stored in SI units internally.
+  Convert at input/output boundaries only (e.g., degrees → radians at load time).
+- Every equation implemented in code should have a corresponding reference
+  comment citing the source paper, textbook, or derivation document.
+  Example:
+    # PN lateral acceleration command — Zarchan (2012), Eq. 3.14
+    a_lateral = self.N * v_c * sigma_dot
+
+- The chi-squared threshold 9.21 corresponds to the 99th percentile of the
+  chi-squared distribution with 2 degrees of freedom. Document this every time
+  it appears, not just once.
+
+- Miss distance is the primary performance metric. Always report it as:
+    mean ± std (m) across N Monte Carlo runs
+
+- Detection rate is defined as the fraction of simulation timesteps where
+  the EKF rejects a measurement (gamma_k > chi2_threshold). Always report
+  as a percentage with the run count: "4.2% (N=200 runs)".
+
+## ─────────────────────────────────────────────────────────────────────────────
+## 15. CURSOR AI BEHAVIOR GUIDELINES
+## ─────────────────────────────────────────────────────────────────────────────
+
+When Cursor generates or suggests code, it must follow all rules above AND:
+
+- Always suggest type hints when completing function signatures.
+- Always generate a matching test stub when generating a new class method.
+- When completing experiment scripts, always include the argparse block and
+  the if __name__ == "__main__": guard.
+- Prefer numpy vectorized operations over Python loops for numerical arrays.
+- When generating docstrings, use the natural research tone described in §7.
+- Never suggest inline lambda functions for anything non-trivial.
+- When a function exceeds 40 lines, proactively suggest a refactor split.
+- Prefer pathlib.Path over os.path for all file system operations.
+- Use f-strings for all string formatting (no % formatting or .format() in new code).
