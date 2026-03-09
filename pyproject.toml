@@ -1,0 +1,17 @@
+# PHANTOM — Python project configuration
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+files = ["core", "experiments", "analysis"]
+
+[tool.pylint.messages_control]
+max-line-length = 100
+min-similarity-lines = 10
+
+[tool.pytest.ini_options]
+addopts = "--cov=core --cov-report=term-missing --cov-fail-under=85"
+testpaths = ["tests"]

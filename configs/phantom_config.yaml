@@ -1,0 +1,46 @@
+# PHANTOM Configuration — Single Source of Truth
+# Author: Naresh Dama | Jacksonville, FL | March 2026
+# Do not hardcode any of these values in source files.
+
+simulation:
+  timestep: 0.02            # seconds — 50 Hz update rate
+  max_time: 30.0            # maximum engagement duration (s)
+  nav_ratio: 4.0            # PN navigation constant N (dimensionless)
+  process_noise: 0.1        # EKF process noise scalar (m^2/s^4)
+  range_noise: 10.0         # measurement noise: range (m)
+  bearing_noise: 0.00873    # measurement noise: bearing (rad) ≈ 0.5 deg
+  chi2_threshold: 9.21      # 99% confidence, 2 DOF chi-squared critical value
+
+monte_carlo:
+  baseline_runs: 100
+  ramp_sweep_runs: 200
+  monte_carlo_runs: 1000
+  parallel_workers: 8
+
+initial_conditions:
+  missile_pos: [0.0, 0.0]       # meters
+  missile_vel: [600.0, 0.0]     # m/s
+  target_pos: [5000.0, 0.0]     # meters
+  target_vel: [-250.0, 0.0]     # m/s
+
+injection:
+  ramp_tstart: 1.0              # seconds
+  ramp_tend: 4.0                # seconds
+  ramp_rates:                   # sweep values (rad/s)
+    - 0.005
+    - 0.010
+    - 0.015
+    - 0.020
+    - 0.025
+    - 0.030
+    - 0.035
+    - 0.040
+    - 0.050
+    - 0.075
+    - 0.100
+
+validation:
+  baseline_miss_threshold: 5.0     # meters — must be below this
+  target_miss_distance: 200.0      # meters — must exceed this
+  max_detection_rate: 0.05         # 5% — must stay below this
+  min_test_coverage: 0.85          # 85% minimum pytest coverage
