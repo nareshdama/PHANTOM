@@ -14,9 +14,12 @@ simulation:
 
 monte_carlo:
   baseline_runs: 100
+  fast_runs: 20
   ramp_sweep_runs: 200
   monte_carlo_runs: 1000
   parallel_workers: 8
+  convergence_window: 50
+  convergence_tolerance: 500.0
   randomization:
     initial_separation_min: 4500.0   # meters
     initial_separation_max: 5500.0   # meters
@@ -43,9 +46,9 @@ injection:
     - 0.020
     - 0.025
     - 0.030
+    - 0.032
     - 0.035
     - 0.040
-    - 0.050
     - 0.075
     - 0.100
 
