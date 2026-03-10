@@ -15,13 +15,16 @@ from pathlib import Path
 from typing import Any
 
 import h5py
-import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import seaborn as sns
 import yaml  # type: ignore[import-untyped]
 from numpy.random import RandomState
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -305,10 +308,23 @@ def randomize_initial_conditions(
         randomization["target_speed_std"],
     )
 
+    bearing_rad = float(np.deg2rad(bearing_deg))
     missile_pos = defaults["missile_pos"].copy()
-    target_pos = range_bearing_to_xy(separation, np.deg2rad(bearing_deg), missile_pos)
+    target_pos = range_bearing_to_xy(separation, bearing_rad, missile_pos)
     missile_vel = np.array([missile_speed, 0.0], dtype=np.float64)
-    target_vel = np.array([-abs(target_speed), 0.0], dtype=np.float64)
+
+    # Baseline Monte Carlo runs should vary geometry without destroying the
+    # null-hypothesis collision course. Choose the target heading so the
+    # initial LOS rate is zero, which is the physically correct no-injection
+    # baseline that Experiment 1 is meant to validate.
+    los_unit = np.array([np.cos(bearing_rad), np.sin(bearing_rad)], dtype=np.float64)
+    missile_speed_cross = missile_speed * abs(np.sin(bearing_rad))
+    if target_speed <= missile_speed_cross:
+        target_speed = missile_speed_cross + 1e-6
+    closing_speed = missile_speed * np.cos(bearing_rad) + np.sqrt(
+        target_speed**2 - missile_speed_cross**2
+    )
+    target_vel = missile_vel - closing_speed * los_unit
     return {
         "missile_pos": missile_pos,
         "missile_vel": missile_vel,

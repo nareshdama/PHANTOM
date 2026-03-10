@@ -51,6 +51,8 @@ injection:
 
 validation:
   baseline_miss_threshold: 5.0     # meters — must be below this
+  baseline_p95_threshold: 10.0     # meters — 95th percentile baseline gate
+  baseline_detection_rate: 0.0     # no injection must produce zero detections
   target_miss_distance: 200.0      # meters — must exceed this
   max_detection_rate: 0.05         # 5% — must stay below this
   min_test_coverage: 0.85          # 85% minimum pytest coverage
