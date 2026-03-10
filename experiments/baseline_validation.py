@@ -199,7 +199,7 @@ def _save_miss_histogram(
     ax.axvline(threshold_m, color="red", linestyle="--", linewidth=1.2)
     ax.set_xlabel("Miss Distance (m)")
     ax.set_ylabel("Frequency")
-    ax.set_title(f"Baseline Miss Distance Distribution (N={runs}, No Injection)")
+    ax.set_title(f"Baseline Miss Distribution (N={runs})")
 
     # The 95th percentile is the key metric for IEEE TAES Table I.
     # It characterizes worst-case performance across the engagement envelope
@@ -210,12 +210,13 @@ def _save_miss_histogram(
     )
     ax.text(
         0.97,
-        0.97,
+        0.75,
         annotation,
         transform=ax.transAxes,
+        fontsize=8,
         ha="right",
         va="top",
-        bbox={"facecolor": "white", "edgecolor": "black", "alpha": 0.9},
+        bbox={"facecolor": "white", "edgecolor": "black", "alpha": 0.9, "pad": 3},
     )
 
     saved_path = save_ieee_figure(fig, "fig01_baseline_miss_distribution", output_dir=figures_dir)
@@ -255,8 +256,10 @@ def _save_sample_trajectory(
     )
     ax.set_xlabel("Downrange Position (m)")
     ax.set_ylabel("Cross-range Position (m)")
-    ax.set_title("Representative Engagement Trajectory (No Injection)")
-    ax.legend(loc="upper right")
+    ax.set_title("Baseline Engagement Trajectory")
+    ax.legend(loc="upper left", fontsize=7, ncol=2, framealpha=0.9)
+    ax.ticklabel_format(axis="y", style="sci", scilimits=(-2, 2))
+    ax.yaxis.get_offset_text().set_fontsize(7)
 
     saved_path = save_ieee_figure(fig, "fig02_baseline_trajectory", output_dir=figures_dir)
     plt.close(fig)
