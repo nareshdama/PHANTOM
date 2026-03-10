@@ -6,6 +6,7 @@ simulation:
   timestep: 0.02            # seconds — 50 Hz update rate
   max_time: 30.0            # maximum engagement duration (s)
   nav_ratio: 4.0            # PN navigation constant N (dimensionless)
+  max_accel_g: 30.0         # maximum missile acceleration (g)
   process_noise: 0.1        # EKF process noise scalar (m^2/s^4)
   range_noise: 10.0         # measurement noise: range (m)
   bearing_noise: 0.00873    # measurement noise: bearing (rad) ≈ 0.5 deg
@@ -16,6 +17,15 @@ monte_carlo:
   ramp_sweep_runs: 200
   monte_carlo_runs: 1000
   parallel_workers: 8
+  randomization:
+    initial_separation_min: 4500.0   # meters
+    initial_separation_max: 5500.0   # meters
+    initial_bearing_min_deg: -20.0   # degrees
+    initial_bearing_max_deg: 20.0    # degrees
+    missile_speed_mean: 600.0        # m/s
+    missile_speed_std: 30.0          # m/s
+    target_speed_mean: 250.0         # m/s
+    target_speed_std: 25.0           # m/s
 
 initial_conditions:
   missile_pos: [0.0, 0.0]       # meters
