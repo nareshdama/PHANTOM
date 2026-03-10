@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from analysis.generate_report import generate_phase1_report
+from analysis.statistics import compare_baseline_vs_injection, fit_miss_distance_scaling
+from core.utils import compute_engagement_statistics, load_phantom_config
 from experiments.baseline_validation import run_baseline_validation
 from experiments.ramp_rate_sweep import evaluate_single_run, run_ramp_rate_sweep
-from core.utils import load_phantom_config
 
 
 def test_baseline_experiment_passes_gate(tmp_path: Path) -> None:
@@ -152,3 +154,92 @@ def test_ramp_sweep_reproducible_with_same_seed(tmp_path: Path) -> None:
     first_miss = [float(summary["mean_miss"]) for summary in first["rate_summaries"]]
     second_miss = [float(summary["mean_miss"]) for summary in second["rate_summaries"]]
     assert first_miss == second_miss
+
+
+def test_statistics_comparison_is_significant(tmp_path: Path) -> None:
+    """Baseline and PHANTOM critical-rate misses should separate significantly."""
+    baseline = run_baseline_validation(
+        seed=42,
+        runs=20,
+        output="baseline_stats_test",
+        results_dir=str(tmp_path / "baseline_results"),
+        figures_dir=str(tmp_path / "baseline_figures"),
+        show_progress=False,
+    )
+    sweep = run_ramp_rate_sweep(
+        seed=42,
+        runs=20,
+        workers=2,
+        output="sweep_stats_test",
+        results_dir=str(tmp_path / "sweep_results"),
+        figures_dir=str(tmp_path / "sweep_figures"),
+        show_progress=False,
+    )
+    critical_row = next(
+        row
+        for row in sweep["rate_summaries"]
+        if float(row["ramp_rate"]) == float(sweep["critical_rate"])
+    )
+
+    comparison = compare_baseline_vs_injection(baseline["results"], critical_row["results"])
+    assert comparison["significant"] is True
+    assert float(comparison["p_value"]) < 0.05
+
+
+def test_power_law_fit_reasonable_exponent(tmp_path: Path) -> None:
+    """The miss-scaling fit should return a plausible super-linear exponent."""
+    sweep = run_ramp_rate_sweep(
+        seed=42,
+        runs=10,
+        workers=2,
+        output="sweep_fit_test",
+        results_dir=str(tmp_path / "results"),
+        figures_dir=str(tmp_path / "figures"),
+        show_progress=False,
+    )
+
+    fit = fit_miss_distance_scaling(
+        [float(row["ramp_rate"]) for row in sweep["rate_summaries"]],
+        [float(row["mean_miss"]) for row in sweep["rate_summaries"]],
+    )
+    assert 0.5 < float(fit["b"]) < 5.0
+    assert float(fit["r_squared"]) > 0.8
+
+
+def test_report_generated_successfully(tmp_path: Path) -> None:
+    """The Phase 1 validation report should be written and marked complete."""
+    baseline = run_baseline_validation(
+        seed=42,
+        runs=20,
+        output="baseline_report_test",
+        results_dir=str(tmp_path / "baseline_results"),
+        figures_dir=str(tmp_path / "baseline_figures"),
+        show_progress=False,
+    )
+    sweep = run_ramp_rate_sweep(
+        seed=42,
+        runs=10,
+        workers=2,
+        output="sweep_report_test",
+        results_dir=str(tmp_path / "sweep_results"),
+        figures_dir=str(tmp_path / "sweep_figures"),
+        show_progress=False,
+    )
+    critical_row = next(
+        row
+        for row in sweep["rate_summaries"]
+        if float(row["ramp_rate"]) == float(sweep["critical_rate"])
+    )
+    comparison = compare_baseline_vs_injection(baseline["results"], critical_row["results"])
+    baseline_stats = compute_engagement_statistics(baseline["results"])
+    report_path = generate_phase1_report(
+        baseline_stats=baseline_stats,
+        sweep_stats=sweep["rate_summaries"],
+        critical_rate=float(sweep["critical_rate"]),
+        comparison_stats=comparison,
+        output_path=str(tmp_path / "PHANTOM_Phase1_ValidationReport.md"),
+    )
+
+    content = Path(report_path).read_text(encoding="utf-8")
+    assert Path(report_path).exists()
+    assert "PHASE 1 COMPLETE" in content

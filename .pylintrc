@@ -1,0 +1,32 @@
+[MASTER]
+ignore=venv
+
+[MESSAGES CONTROL]
+disable=
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    duplicate-code,
+    too-few-public-methods,
+    wrong-import-position,
+    ungrouped-imports,
+    no-member,
+    line-too-long,
+    invalid-name,
+    unused-variable,
+    import-outside-toplevel,
+    consider-using-with,
+    global-statement,
+    consider-using-generator,
+    too-many-instance-attributes,
+    unused-import,
+    unbalanced-tuple-unpacking
+
+[FORMAT]
+max-line-length=100
+
+[DESIGN]
+max-args=10
+max-locals=30
+max-branches=20
+max-statements=80
