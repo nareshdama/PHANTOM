@@ -24,7 +24,7 @@ import yaml  # type: ignore[import-untyped]
 from numpy.random import RandomState
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # noqa: E402
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -422,6 +422,12 @@ def save_ieee_figure(fig: Any, filename: str, output_dir: str = "figures") -> st
     300 DPI export settings.
     """
     output_path = _build_output_path(output_dir, filename, ".png")
-    fig.savefig(output_path, dpi=300, bbox_inches="tight", format="png")
+    fig.savefig(
+        output_path,
+        dpi=300,
+        bbox_inches="tight",
+        format="png",
+        pil_kwargs={"dpi": (300, 300)},
+    )
     LOGGER.info("Saved PHANTOM figure to %s", output_path)
     return str(output_path)

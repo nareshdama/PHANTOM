@@ -141,12 +141,14 @@ def _print_summary(
     print()
     print("Results:")
     print(
-        f"  Mean miss distance:    {float(stats['mean_miss']):.2f} ± {float(stats['std_miss']):.2f} m"
+        f"  Mean miss distance:    {float(stats['mean_miss']):.2f}"
+        f" ± {float(stats['std_miss']):.2f} m"
     )
     print(f"  Median miss distance:  {float(stats['median_miss']):.2f} m")
     print(f"  95th percentile:       {float(stats['p95_miss']):.2f} m")
     print(
-        f"  Min / Max:             {float(stats['min_miss']):.2f} / {float(stats['max_miss']):.2f} m"
+        f"  Min / Max:             {float(stats['min_miss']):.2f}"
+        f" / {float(stats['max_miss']):.2f} m"
     )
     print(f"  Detection rate:        {float(stats['mean_detection']) * 100.0:.2f}%")
     print(f"  Success rate:          {float(stats['success_rate']) * 100.0:.1f}%")

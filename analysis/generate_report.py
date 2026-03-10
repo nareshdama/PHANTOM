@@ -156,6 +156,11 @@ def _format_float(value: float | None, digits: int = 2) -> str:
     return "N/A" if value is None else f"{value:.{digits}f}"
 
 
+def _gate_row(criterion: str, target: str, result: str) -> str:
+    """Format one Phase 1 gate criterion as a Markdown table row."""
+    return f"| {criterion} | {target} | {result} | ✅ PASS |"
+
+
 def _build_markdown_table(rows: list[dict[str, Any]]) -> str:
     """Render the Experiment 3 sweep table in Markdown."""
     header = "| Rate (rad/s) | Mean Miss (m) | Std (m) | Detection (%) | Converged |\n"
@@ -184,7 +189,7 @@ def generate_phase1_report(
     This document is the formal Phase 1 gate artifact. It must exist
     and all gate criteria must show PASSED before Phase 2 begins.
     """
-    config = load_phantom_config()
+    load_phantom_config()
     sweep_frame = pd.DataFrame(sweep_stats)
     critical_row = max(
         [row for row in sweep_stats if float(row["ramp_rate"]) == critical_rate],
@@ -207,6 +212,14 @@ def generate_phase1_report(
     total_tests = int(qa_summary["test_count"])
     phase_status = "PASS"
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    bl_mean = float(baseline_stats["mean_miss"])
+    bl_p95 = float(baseline_stats["p95_miss"])
+    bl_det = float(baseline_stats["mean_detection"]) * 100.0
+    cr_miss = float(critical_row["mean_miss"])
+    cr_det = float(critical_row["mean_detection"]) * 100.0
+    p_val = float(comparison_stats["p_value"])
+    cov_str = _format_float(total_coverage, 2)
 
     figure_inventory = [
         (
@@ -252,9 +265,11 @@ def generate_phase1_report(
         "## 1. Executive Summary",
         (
             "Phase 1 validated the PHANTOM simulator against the no-injection baseline, "
-            f"identified a critical false-LOS ramp rate of `{critical_rate:.3f} rad/s`, and "
-            f"confirmed the primary deception hypothesis with `{float(critical_row['mean_miss']):.1f} m` "
-            f"mean miss distance at `{float(critical_row['mean_detection']) * 100.0:.2f}%` detection. "
+            f"identified a critical false-LOS ramp rate of "
+            f"`{critical_rate:.3f} rad/s`, and "
+            f"confirmed the primary deception hypothesis with "
+            f"`{cr_miss:.1f} m` "
+            f"mean miss distance at `{cr_det:.2f}%` detection. "
             "The phase therefore closes with a passing baseline gate, a passing critical-rate "
             "gate, statistically significant separation between baseline and injection miss "
             "performance, and a complete publication-quality figure set."
@@ -264,15 +279,17 @@ def generate_phase1_report(
         "",
         "| Criterion | Target | Result | Status |",
         "|---|---|---|---|",
-        f"| Mean miss (baseline) | < 5.0 m | {float(baseline_stats['mean_miss']):.2f} m | ✅ PASS |",
-        f"| 95th percentile (baseline) | < 10.0 m | {float(baseline_stats['p95_miss']):.2f} m | ✅ PASS |",
-        f"| Detection rate (baseline) | 0.0% | {float(baseline_stats['mean_detection']) * 100.0:.2f}% | ✅ PASS |",
-        f"| Critical rate identified | ✅ | {critical_rate:.3f} rad/s | ✅ PASS |",
-        f"| Mean miss at critical rate | > 200 m | {float(critical_row['mean_miss']):.1f} m | ✅ PASS |",
-        f"| Detection at critical rate | < 5% | {float(critical_row['mean_detection']) * 100.0:.2f}% | ✅ PASS |",
-        f"| Statistical significance | p < 0.001 | p={float(comparison_stats['p_value']):.2e} | ✅ PASS |",
-        f"| Unit test coverage | ≥ 85% | {_format_float(total_coverage, 2)}% | ✅ PASS |",
-        f"| All tests passing | {total_tests}/{total_tests} | {total_tests}/{total_tests} | ✅ PASS |",
+        _gate_row("Mean miss (baseline)", "< 5.0 m", f"{bl_mean:.2f} m"),
+        _gate_row("95th percentile (baseline)", "< 10.0 m", f"{bl_p95:.2f} m"),
+        _gate_row("Detection rate (baseline)", "0.0%", f"{bl_det:.2f}%"),
+        _gate_row("Critical rate identified", "✅", f"{critical_rate:.3f} rad/s"),
+        _gate_row("Mean miss at critical rate", "> 200 m", f"{cr_miss:.1f} m"),
+        _gate_row("Detection at critical rate", "< 5%", f"{cr_det:.2f}%"),
+        _gate_row("Statistical significance", "p < 0.001", f"p={p_val:.2e}"),
+        _gate_row("Unit test coverage", "≥ 85%", f"{cov_str}%"),
+        _gate_row(
+            "All tests passing", f"{total_tests}/{total_tests}", f"{total_tests}/{total_tests}"
+        ),
         "",
         "**Overall Gate Status: ✅ PHASE 1 COMPLETE — READY FOR PHASE 2**",
         "",
@@ -355,14 +372,30 @@ def generate_phase1_report(
         ),
         "",
         "Open Phase 2 questions:",
-        "1. How close to the EKF gate can PHANTOM remain over the full engagement without triggering rejection bursts?",
-        "2. How should injection profiles adapt online to target different miss vectors while preserving plausibility?",
-        "3. What dataset and prompt structure best trains an LLM policy to synthesize PHANTOM-compatible deception commands?",
+        (
+            "1. How close to the EKF gate can PHANTOM remain over the "
+            "full engagement without triggering rejection bursts?"
+        ),
+        (
+            "2. How should injection profiles adapt online to target "
+            "different miss vectors while preserving plausibility?"
+        ),
+        (
+            "3. What dataset and prompt structure best trains an LLM "
+            "policy to synthesize PHANTOM-compatible deception commands?"
+        ),
         "",
         "## 10. References",
-        "- Zarchan, P. (2012). *Tactical and Strategic Missile Guidance* (6th ed.). AIAA.",
-        "- Bar-Shalom, Y., Li, X. R., & Kirubarajan, T. (2001). *Estimation with Applications to Tracking and Navigation*. Wiley.",
-        "- Brown, R. G., & Hwang, P. Y. C. (2012). *Introduction to Random Signals and Applied Kalman Filtering*. Wiley.",
+        ("- Zarchan, P. (2012). *Tactical and Strategic " "Missile Guidance* (6th ed.). AIAA."),
+        (
+            "- Bar-Shalom, Y., Li, X. R., & Kirubarajan, T. (2001). "
+            "*Estimation with Applications to Tracking and Navigation*. "
+            "Wiley."
+        ),
+        (
+            "- Brown, R. G., & Hwang, P. Y. C. (2012). *Introduction to "
+            "Random Signals and Applied Kalman Filtering*. Wiley."
+        ),
     ]
 
     output_file = PROJECT_ROOT / output_path

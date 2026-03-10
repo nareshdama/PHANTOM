@@ -218,7 +218,8 @@ def _save_miss_figure(
     ax.set_title("PHANTOM Miss Distance vs. Injection Ramp Rate")
     annotation = (
         f"Critical rate: {float(critical_summary['ramp_rate']):.3f} rad/s\n"
-        f"Miss: {float(critical_summary['mean_miss']):.1f} ± {float(critical_summary['std_miss']):.1f} m"
+        f"Miss: {float(critical_summary['mean_miss']):.1f}"
+        f" ± {float(critical_summary['std_miss']):.1f} m"
     )
     ax.text(
         0.97,
@@ -379,16 +380,21 @@ def _print_results_table(
         print("╚══════════════════════════════════════════════════════════════════════════╝")
     print()
     print("Validation Gate:")
-    print(f"  {'✅' if critical_summary else '❌'} Critical rate identified")
+    _cr = critical_summary
+    print(f"  {'✅' if _cr else '❌'} Critical rate identified")
+    _miss_ok = _cr and float(_cr["mean_miss"]) > target_miss
+    _miss_v = float(_cr["mean_miss"]) if _cr else float("nan")
     print(
-        f"  {'✅' if critical_summary and float(critical_summary['mean_miss']) > target_miss else '❌'} "
-        f"Mean miss > {target_miss:.0f} m          "
-        f"[{float(critical_summary['mean_miss']) if critical_summary else float('nan'):.1f} m]"
+        f"  {'✅' if _miss_ok else '❌'}"
+        f" Mean miss > {target_miss:.0f} m"
+        f"          [{_miss_v:.1f} m]"
     )
+    _det_ok = _cr and float(_cr["mean_detection"]) < detection_limit
+    _det_v = float(_cr["mean_detection"]) * 100.0 if _cr else float("nan")
     print(
-        f"  {'✅' if critical_summary and float(critical_summary['mean_detection']) < detection_limit else '❌'} "
-        f"Detection rate < {detection_limit * 100.0:.0f}%        "
-        f"[{(float(critical_summary['mean_detection']) * 100.0) if critical_summary else float('nan'):.2f}%]"
+        f"  {'✅' if _det_ok else '❌'}"
+        f" Detection rate < {detection_limit * 100.0:.0f}%"
+        f"        [{_det_v:.2f}%]"
     )
     print(
         f"  {'✅' if all(bool(summary['converged']) for summary in rate_summaries) else '❌'} "

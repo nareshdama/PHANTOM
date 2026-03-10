@@ -20,13 +20,14 @@ disable=
     consider-using-generator,
     too-many-instance-attributes,
     unused-import,
-    unbalanced-tuple-unpacking
+    unbalanced-tuple-unpacking,
+    implicit-str-concat
 
 [FORMAT]
 max-line-length=100
 
 [DESIGN]
 max-args=10
-max-locals=30
+max-locals=35
 max-branches=20
 max-statements=80

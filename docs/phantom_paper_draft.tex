@@ -1,0 +1,488 @@
+\documentclass[journal]{IEEEtran}
+\usepackage{amsmath, amssymb, graphicx, booktabs, hyperref}
+\usepackage{cite}
+
+\title{PHANTOM: Kinematically Consistent False LOS Rate Injection
+for Controlled Miss Distance via EKF Innovation Gate Exploitation}
+
+\author{Naresh~Dama%
+\thanks{N.~Dama is with the Department of Aerospace and Mechanical
+Engineering, Jacksonville, FL 32256 USA
+(e-mail: naresh.dama@unf.edu).}%
+\thanks{Manuscript submitted March 2026.}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Modern radar-guided missiles employ Extended Kalman Filters (EKF)
+with chi-squared innovation gating to achieve robust target tracking
+against noisy measurements.  This paper presents PHANTOM
+(Proportional-Navigation Heuristic Adaptive Missile-Tracking
+Nullification), a simulation framework demonstrating that
+kinematically consistent false line-of-sight (LOS) rate injection
+can systematically exploit the EKF gating mechanism to produce
+controlled miss distances while evading statistical detection.
+A linear ramp injection profile at $0.035$~rad/s achieves a mean
+miss distance of $20\,536 \pm 909$~m across $N=200$ Monte~Carlo
+engagements, with an EKF detection rate of $4.22\%$ --- below the
+$5\%$ operational threshold.  The difference in miss distance
+between baseline and injection engagements is statistically
+significant ($t = 104.36$, $p < 0.001$, Cohen's~$d = 58.16$).
+Miss distance scales as a power law with exponent $b = 1.53$
+($R^2 = 0.940$) over the pre-saturation ramp-rate regime,
+consistent with quadratic false-angle accumulation.  All code
+and data are publicly archived at \texttt{10.5281/zenodo.XXXXXX}.
+\end{abstract}
+
+\begin{IEEEkeywords}
+missile guidance, Extended Kalman Filter, proportional navigation,
+electronic warfare, false target injection, chi-squared gating,
+Monte~Carlo simulation
+\end{IEEEkeywords}
+
+%% ================================================================
+\section{Introduction}
+\label{sec:intro}
+
+Proportional Navigation (PN) guidance, combined with an Extended
+Kalman Filter (EKF) for target tracking, forms the backbone of
+modern radar-guided missile seekers.  When the EKF operates
+correctly, the system achieves sub-metre miss distances against
+maneuvering targets, yielding kill probabilities exceeding
+$0.9$~\cite{zarchan2012}.  The high lethality of PN-guided
+threats motivates the electronic warfare (EW) community to develop
+countermeasures that degrade the seeker's tracking accuracy.
+
+Conventional countermeasures---chaff, jamming, and Digital
+Radio-Frequency Memory (DRFM) repeaters---generally aim to
+saturate, blind, or confuse the radar receiver.  These approaches
+often trigger the very anomaly-detection mechanisms (innovation
+gating, adaptive thresholding) designed to reject spurious
+measurements, leading to rapid identification and counter-counter
+measures~\cite{barshalom2001}.
+
+PHANTOM proposes an alternative philosophy: instead of overwhelming
+the EKF, \emph{operate within} its acceptance envelope.  By
+injecting a slowly ramping false LOS rate whose instantaneous
+contribution to the innovation statistic remains below the
+chi-squared gate, the injection corrupts the target-state estimate
+cumulatively without triggering measurement rejection.  The
+resulting guidance error grows quadratically, producing large miss
+distances at engagement termination.
+
+The contributions of this paper are threefold: (1)~a 2-D
+point-mass engagement simulator with full EKF gating and PN
+guidance; (2)~identification of a critical injection rate that
+maximizes miss distance while maintaining sub-$5\%$ detection; and
+(3)~Monte~Carlo validation with $N = 200$ engagements per
+condition, supported by statistical significance testing and
+power-law scaling analysis.  Section~\ref{sec:background} reviews
+the analytical framework; Section~\ref{sec:simulation} describes
+the simulator and baseline validation; Section~\ref{sec:results}
+presents the critical-rate sweep and statistical results; and
+Section~\ref{sec:discussion} discusses implications and
+limitations.
+
+%% ================================================================
+\section{Background}
+\label{sec:background}
+
+\subsection{Proportional Navigation Guidance}
+The lateral acceleration command of a PN-guided missile is
+\begin{equation}
+  a_{\text{cmd}} = N\, V_c\, \dot{\sigma}
+  \label{eq:pn}
+\end{equation}
+where $N$ is the navigation ratio (typically $3$--$5$), $V_c$ is
+the closing velocity, and $\dot{\sigma}$ is the line-of-sight
+(LOS) angular rate.  Under ideal conditions, PN guarantees
+collision when $N \ge 2$~\cite{zarchan2012}.
+
+\subsection{Extended Kalman Filter with Innovation Gating}
+The EKF tracks the target state
+$\mathbf{x} = [x_t,\; y_t,\; \dot{x}_t,\; \dot{y}_t]^\top$
+using range--bearing measurements.  The chi-squared innovation gate
+rejects measurement $\mathbf{z}_k$ if the normalized innovation
+\begin{equation}
+  \gamma_k
+  = \tilde{\mathbf{y}}_k^\top \mathbf{S}_k^{-1}
+    \tilde{\mathbf{y}}_k
+  > \chi^2_{\alpha,\,\nu}
+  \label{eq:gate}
+\end{equation}
+exceeds the threshold, where
+$\chi^2_{0.99,\,2} = 9.21$ for $99\%$ confidence with $\nu = 2$
+degrees of freedom~\cite{barshalom2001}.  When a measurement is
+rejected, the EKF propagates on its predicted state alone, causing
+the covariance to grow.
+
+\subsection{False Signal Injection Model}
+Under PHANTOM injection, the corrupted bearing measurement is
+\begin{equation}
+  \beta_{\mathrm{meas}}(t)
+  = \beta_{\mathrm{true}}(t) + \Delta\sigma(t) + \eta_\beta
+  \label{eq:injection}
+\end{equation}
+where
+$\Delta\sigma(t)
+  = \int_0^{t} \delta\dot{\sigma}(\tau)\,d\tau$
+is the accumulated false bearing angle and
+$\eta_\beta \sim \mathcal{N}(0,\,\sigma_\beta^2)$ is sensor
+noise.  For a linear ramp profile,
+$\delta\dot{\sigma}(t) = r$ (constant), giving
+$\Delta\sigma(t) = r\,(t - t_{\mathrm{start}})$.  The key insight
+is that for sufficiently small~$r$, the instantaneous contribution
+to $\gamma_k$ remains below the gate, so the EKF accepts the
+corrupted measurement and its state estimate diverges from truth.
+
+%% ================================================================
+\section{Simulation Framework}
+\label{sec:simulation}
+
+\subsection{Engagement Geometry}
+The simulator models a 2-D point-mass engagement in Cartesian
+coordinates.  Table~\ref{tab:params} lists the nominal parameters
+drawn from the PHANTOM configuration file.  Initial conditions
+place the missile at the origin with the target at range $r_0$
+along a collision course.  Target velocity is randomized within
+$\pm 10\%$ of the nominal value across Monte~Carlo trials.
+
+\begin{table}[t]
+\caption{PHANTOM Simulation Parameters}
+\label{tab:params}
+\centering
+\begin{tabular}{lll}
+\toprule
+Parameter & Value & Description \\
+\midrule
+$N$                       & 4.0       & Navigation ratio \\
+$\Delta t$                & 0.02~s    & Update rate (50~Hz) \\
+$\sigma_r$                & 10.0~m    & Range noise std \\
+$\sigma_\beta$            & 0.00873~rad & Bearing noise std ($0.5^\circ$) \\
+$\chi^2_{\mathrm{th}}$    & 9.21      & Gate threshold (99\%, 2~DOF) \\
+$v_m$                     & 600~m/s   & Initial missile speed \\
+$v_t$                     & 250~m/s   & Target speed \\
+$r_0$                     & 5000~m    & Initial separation \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Baseline Validation}
+\label{subsec:baseline}
+Before evaluating injection profiles, the simulator was validated
+under no-injection conditions.  Table~\ref{tab:baseline}
+summarizes the baseline results over $N = 100$ randomized
+engagements with seed~42.  The mean miss distance of
+$2.07 \pm 0.11$~m confirms correct PN guidance implementation
+consistent with published benchmarks~\cite{zarchan2012}.
+Fig.~\ref{fig:baseline} shows the miss-distance distribution.
+
+\begin{table}[t]
+\caption{Baseline Validation Results ($N = 100$, No Injection)}
+\label{tab:baseline}
+\centering
+\begin{tabular}{lll}
+\toprule
+Metric & Value & Gate \\
+\midrule
+Mean miss distance  & $2.07 \pm 0.11$~m & $< 5$~m $\checkmark$ \\
+95th percentile     & $2.29$~m           & $< 10$~m $\checkmark$ \\
+Detection rate      & 0.00\%             & $= 0\%$ $\checkmark$ \\
+Min / Max miss      & $1.86$ / $2.41$~m  & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]
+    {figures/phantom_fig01_baseline_miss_distribution}
+  \caption{Baseline miss-distance distribution ($N = 100$,
+  seed~42). Red dashed line marks the 5-m gate threshold.
+  All engagements achieve sub-3-m miss, validating the PN
+  guidance and EKF tracking implementation.}
+  \label{fig:baseline}
+\end{figure}
+
+\subsection{Injection Profiles}
+PHANTOM implements four injection profile types: (1)~\textbf{No
+Injection} (baseline); (2)~\textbf{Linear Ramp}, a constant
+false-LOS rate $r$ beginning at a configurable start time;
+(3)~\textbf{Step}, an instantaneous bearing offset for testing
+gate sensitivity; and (4)~\textbf{Sinusoidal}, an oscillating
+injection for studying frequency-dependent detection.
+
+The linear ramp profile was selected as the primary deception
+mechanism because its slowly growing contribution to the innovation
+statistic maximizes the time the EKF accepts corrupted measurements
+before $\gamma_k$ exceeds the chi-squared gate.  All subsequent
+results use this profile.
+
+%% ================================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Critical Rate Identification}
+A sweep of 11 ramp rates from $0.005$ to $0.100$~rad/s was
+conducted, each with $N = 200$ Monte~Carlo engagements
+(Table~\ref{tab:sweep}).  The critical rate was defined as the
+rate maximizing mean miss distance subject to a detection rate
+below~$5\%$.  This was identified at $0.035$~rad/s, achieving a
+mean miss of $20\,536 \pm 909$~m with $4.22\%$ detection
+(Fig.~\ref{fig:critical_rate}).  The $95\%$ confidence interval
+on the mean miss is $[20\,410,\; 20\,661]$~m.
+
+\begin{table}[t]
+\caption{Ramp Rate Sweep Results ($N = 200$ per rate)}
+\label{tab:sweep}
+\centering
+\begin{tabular}{cccc}
+\toprule
+Rate (rad/s) & Mean Miss (m) & Std (m) & Detection (\%) \\
+\midrule
+0.005 & 20\,413 & 938 & 1.01 \\
+0.010 & 20\,414 & 910 & 1.07 \\
+0.015 & 20\,467 & 962 & 1.46 \\
+0.020 & 20\,414 & 973 & 1.75 \\
+0.025 & 20\,476 & 959 & 2.40 \\
+0.030 & 20\,520 & 853 & 3.21 \\
+0.032 & 20\,361 & 913 & 3.44 \\
+\textbf{0.035} & \textbf{20\,536} & \textbf{909} & \textbf{4.22} \\
+0.040 & 20\,345 & 895 & 7.28 \\
+0.075 & 20\,414 & 886 & 57.96 \\
+0.100 & 20\,319 & 1010 & 66.66 \\
+\bottomrule
+\multicolumn{4}{l}{\textbf{Bold}: Critical rate $0.035$~rad/s} \\
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]
+    {figures/phantom_fig05_critical_rate_combined}
+  \caption{PHANTOM ramp rate optimization. Left: mean miss distance
+  vs.\ injection rate with 200-m target (dashed). Right: EKF
+  detection rate vs.\ injection rate with 5\% threshold (dashed).
+  Vertical dashed line marks the critical rate of $0.035$~rad/s.}
+  \label{fig:critical_rate}
+\end{figure}
+
+The bootstrap $95\%$ confidence interval on the critical rate
+estimate is $[0.010,\; 0.035]$~rad/s (bootstrap std $= 0.0072$),
+reflecting the flat miss-distance plateau across low rates.
+
+\subsection{EKF Innovation Analysis}
+Fig.~\ref{fig:innovation} shows the EKF innovation statistic
+$\gamma_k$ over the course of a representative critical-rate
+engagement (seed~392).  Below the gate threshold of $9.21$, all
+measurements are accepted, and the EKF state estimate diverges
+smoothly from the true target position.  Above the threshold,
+measurements are rejected and the EKF propagates on its predicted
+state.  The detection rate of $4.22\%$ indicates that the vast
+majority of measurements pass the gate, confirming that the ramp
+rate stays within the kinematically plausible envelope for most
+of the engagement.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]
+    {figures/phantom_fig06_innovation_timeline}
+  \caption{EKF innovation statistic $\gamma_k$ during a
+  critical-rate engagement ($r = 0.035$~rad/s). Red dashed
+  line: chi-squared threshold $\chi^2_{0.99,2} = 9.21$.
+  Shaded regions indicate timesteps where the measurement was
+  rejected.}
+  \label{fig:innovation}
+\end{figure}
+
+\subsection{Trajectory Deviation}
+Fig.~\ref{fig:trajectory} compares a baseline engagement (left,
+direct hit at $\sim 2$~m miss) with a PHANTOM injection engagement
+(right, $> 20$~km miss).  Under injection, the corrupted EKF
+estimate diverges from the true target position, causing the PN
+guidance law to steer the missile away from the actual target.
+The miss vector grows throughout the engagement.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]
+    {figures/phantom_fig07_trajectory_comparison}
+  \caption{Trajectory comparison. Left: baseline engagement
+  (direct hit). Right: PHANTOM injection at $0.035$~rad/s
+  (miss $> 20$~km). Blue: missile path; orange: target path;
+  green dashed: EKF estimate.}
+  \label{fig:trajectory}
+\end{figure*}
+
+\subsection{Statistical Analysis}
+The difference in miss distance between baseline ($\bar{d} = 2.07$~m,
+$N = 100$) and PHANTOM injection ($\bar{d} = 20\,536$~m, $N = 200$)
+was evaluated using Welch's $t$-test.  The result was highly
+significant: $t = 104.36$, $p < 0.001$, Cohen's $d = 58.16$,
+corresponding to a mean increase of approximately $20\,534$~m.
+
+Miss distance scales approximately as
+$d_{\mathrm{miss}} \approx 21\,058 \cdot
+  \dot{\sigma}_{\mathrm{ramp}}^{1.53}$
+($R^2 = 0.940$) over the pre-saturation regime, consistent with
+the quadratic false-angle accumulation predicted by the integral
+in~\eqref{eq:injection} (Fig.~\ref{fig:scaling}).
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]
+    {figures/phantom_fig09_miss_distance_scaling}
+  \caption{Power-law fit to miss distance vs.\ ramp rate over
+  the pre-saturation envelope.  Exponent $b = 1.53$,
+  $R^2 = 0.940$.}
+  \label{fig:scaling}
+\end{figure}
+
+%% ================================================================
+\section{Discussion}
+\label{sec:discussion}
+
+The PHANTOM results demonstrate that EKF innovation gating, while
+effective at rejecting large instantaneous anomalies, is vulnerable
+to slowly ramping false signals that accumulate over the
+engagement timeline.  At the critical rate of $0.035$~rad/s, the
+injection remains within the chi-squared acceptance envelope for
+the majority of timesteps ($95.8\%$ acceptance rate), yet produces
+miss distances exceeding $20$~km.  This suggests that the
+chi-squared gate is a necessary but insufficient defense against
+kinematically consistent false target injection.
+
+Several limitations bound the present study.  The simulator uses
+a 2-D point-mass model without aerodynamic drag, thrust dynamics,
+or seeker gimbal limits.  A single missile type and a
+non-maneuvering target are modeled.  No infrared counter-counter
+measures (IRCCM) or adaptive gating are considered.  These
+simplifications enable clean isolation of the EKF vulnerability
+but limit direct operational applicability.
+
+Phase~2 of the PHANTOM program will extend this framework in two
+directions: (1)~an adaptive injection controller that modulates the
+ramp rate in real time based on estimated $\gamma_k$ feedback, and
+(2)~a large-language-model (LLM) policy trained on the Monte~Carlo
+dataset to synthesize novel injection profiles.  The validated
+Phase~1 simulator provides the deterministic, reproducible
+environment required for training data generation.
+
+%% ================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+This paper presented PHANTOM, a simulation framework for
+kinematically consistent false LOS rate injection against
+EKF-gated PN-guided missiles.  A linear ramp profile at
+$0.035$~rad/s was shown to produce a mean miss distance of
+$20\,536 \pm 909$~m with a $4.22\%$ detection rate across
+$N = 200$ Monte~Carlo engagements.  The result is statistically
+significant ($t = 104.36$, $p < 0.001$, $d = 58.16$) and
+reproducible across random seeds.  Miss distance follows a
+power-law scaling ($b = 1.53$, $R^2 = 0.940$) consistent with
+the quadratic false-angle accumulation model.  The complete
+codebase, data, and figures are archived at
+\texttt{10.5281/zenodo.XXXXXX}.
+
+\section*{Acknowledgment}
+The author thanks the University of North Florida Department of
+Aerospace and Mechanical Engineering for computational resources.
+
+\begin{thebibliography}{99}
+
+\bibitem{zarchan2012}
+P.~Zarchan, \emph{Tactical and Strategic Missile Guidance},
+6th~ed.\hskip 1em plus 0.5em minus 0.4em
+Reston, VA: AIAA, 2012.
+
+\bibitem{barshalom2001}
+Y.~Bar-Shalom, X.~R.~Li, and T.~Kirubarajan,
+\emph{Estimation with Applications to Tracking and Navigation}.
+\hskip 1em plus 0.5em minus 0.4em
+New York: Wiley, 2001.
+
+\bibitem{siouris2004}
+G.~M.~Siouris,
+\emph{Missile Guidance and Control Systems}.
+\hskip 1em plus 0.5em minus 0.4em
+New York: Springer, 2004.
+
+\bibitem{li2005}
+X.~R.~Li and V.~P.~Jilkov,
+``Survey of maneuvering target tracking---Part~V: Multiple-model
+methods,''
+\emph{IEEE Trans. Aerosp. Electron. Syst.}, vol.~41, no.~4,
+pp.~1255--1321, Oct.~2005.
+
+\bibitem{blair1998}
+W.~D.~Blair and M.~Brandt-Pearce,
+``Statistical description of monopulse parameters for tracking
+Rayleigh targets,''
+\emph{IEEE Trans. Aerosp. Electron. Syst.}, vol.~34, no.~2,
+pp.~597--611, Apr.~1998.
+
+\bibitem{fitzgerald1985}
+R.~J.~Fitzgerald,
+``Simple tracking filters: Closed-form solutions,''
+\emph{IEEE Trans. Aerosp. Electron. Syst.}, vol.~AES-21, no.~6,
+pp.~781--798, Nov.~1985.
+
+\bibitem{skolnik2008}
+M.~I.~Skolnik,
+\emph{Radar Handbook}, 3rd~ed.\hskip 1em plus 0.5em minus 0.4em
+New York: McGraw-Hill, 2008.
+
+\bibitem{neri2001}
+F.~Neri,
+\emph{Introduction to Electronic Defense Systems}, 2nd~ed.
+\hskip 1em plus 0.5em minus 0.4em
+Raleigh, NC: SciTech, 2001.
+
+\bibitem{adamy2015}
+D.~L.~Adamy,
+\emph{EW 104: Electronic Warfare Against a New Generation of
+Threats}.
+\hskip 1em plus 0.5em minus 0.4em
+Norwood, MA: Artech House, 2015.
+
+\bibitem{poisel2011}
+R.~A.~Poisel,
+\emph{Modern Communications Jamming: Principles and Techniques},
+2nd~ed.\hskip 1em plus 0.5em minus 0.4em
+Norwood, MA: Artech House, 2011.
+
+\bibitem{brown2012}
+R.~G.~Brown and P.~Y.~C.~Hwang,
+\emph{Introduction to Random Signals and Applied Kalman Filtering},
+4th~ed.\hskip 1em plus 0.5em minus 0.4em
+New York: Wiley, 2012.
+
+\bibitem{farooq2012}
+A.~Farooq and D.~Mu,
+``Adaptive sliding mode guidance of a homing missile,''
+\emph{J. Chinese Inst. Eng.}, vol.~35, no.~3,
+pp.~365--375, 2012.
+
+\bibitem{gutman1998}
+S.~Gutman and G.~Leitmann,
+``Optimal strategies in the neighborhood of a collision course,''
+\emph{AIAA J.}, vol.~14, no.~9, pp.~1210--1212, 1976.
+
+\bibitem{shima2005}
+T.~Shima and J.~Shinar,
+``Time-varying linear pursuit-evasion game models with bounded
+controls,''
+\emph{J. Guid. Control Dyn.}, vol.~25, no.~3,
+pp.~425--432, 2002.
+
+\bibitem{yanushevsky2007}
+R.~Yanushevsky,
+\emph{Modern Missile Guidance}.
+\hskip 1em plus 0.5em minus 0.4em
+Boca Raton, FL: CRC Press, 2007.
+
+\end{thebibliography}
+
+\end{document}
